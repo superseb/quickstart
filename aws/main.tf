@@ -30,6 +30,11 @@ variable "count_agent_all_nodes" {
   description = "Number of Agent All Designation Nodes"
 }
 
+variable "count_agent_all_nodes_arm" {
+  default     = "1"
+  description = "Number of Agent All Designation Nodes"
+}
+
 variable "count_agent_etcd_nodes" {
   default     = "0"
   description = "Number of ETCD Nodes"
@@ -65,6 +70,12 @@ variable "type" {
   description = "Amazon AWS Instance Type"
 }
 
+variable "type_arm" {
+  default     = "a1.large"
+  description = "Amazon AWS Instance Type"
+}
+
+
 variable "docker_version_server" {
   default     = "17.03"
   description = "Docker Version to run on Rancher Server"
@@ -87,6 +98,21 @@ data "aws_ami" "ubuntu" {
   filter {
     name   = "name"
     values = ["ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+data "aws_ami" "ubuntu_arm" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-arm64-server-*"]
   }
 
   filter {
@@ -151,6 +177,20 @@ data "template_cloudinit_config" "rancheragent-all-cloudinit" {
   }
 }
 
+data "template_cloudinit_config" "rancheragent-arm-all-cloudinit" {
+  count = "${var.count_agent_all_nodes}"
+
+  part {
+    content_type = "text/cloud-config"
+    content      = "hostname: ${var.prefix}-rancheragent-${count.index}-arm-all\nmanage_etc_hosts: true"
+  }
+
+  part {
+    content_type = "text/x-shellscript"
+    content      = "${data.template_file.userdata_agent_arm.rendered}"
+  }
+}
+
 resource "aws_instance" "rancheragent-all" {
   count           = "${var.count_agent_all_nodes}"
   ami             = "${data.aws_ami.ubuntu.id}"
@@ -161,6 +201,19 @@ resource "aws_instance" "rancheragent-all" {
 
   tags {
     Name = "${var.prefix}-rancheragent-${count.index}-all"
+  }
+}
+
+resource "aws_instance" "rancheragent-arm-all" {
+  count           = "${var.count_agent_all_nodes_arm}"
+  ami             = "${data.aws_ami.ubuntu_arm.id}"
+  instance_type   = "${var.type_arm}"
+  key_name        = "${var.ssh_key_name}"
+  security_groups = ["${aws_security_group.rancher_sg_allowall.name}"]
+  user_data       = "${data.template_cloudinit_config.rancheragent-arm-all-cloudinit.*.rendered[count.index]}"
+
+  tags {
+    Name = "${var.prefix}-rancheragent-${count.index}-arm-all"
   }
 }
 
@@ -259,6 +312,18 @@ data "template_file" "userdata_server" {
 
 data "template_file" "userdata_agent" {
   template = "${file("files/userdata_agent")}"
+
+  vars {
+    admin_password       = "${var.admin_password}"
+    cluster_name         = "${var.cluster_name}"
+    docker_version_agent = "${var.docker_version_agent}"
+    rancher_version      = "${var.rancher_version}"
+    server_address       = "${aws_instance.rancherserver.public_ip}"
+  }
+}
+
+data "template_file" "userdata_agent_arm" {
+  template = "${file("files/userdata_agent_arm")}"
 
   vars {
     admin_password       = "${var.admin_password}"

@@ -14,6 +14,7 @@ admin_password = "admin"
 rancher_version = "latest"
 # Count of agent nodes with role all
 count_agent_all_nodes = "1"
+count_agent_all_nodes_arm = "0"
 # Count of agent nodes with role etcd
 count_agent_etcd_nodes = "0"
 # Count of agent nodes with role controlplane
@@ -26,3 +27,4 @@ docker_version_server = "17.03"
 docker_version_agent = "17.03"
 # AWS Instance Type
 type = "t3.medium"
+type_arm = "a1.large"
